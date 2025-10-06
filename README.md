@@ -10,6 +10,7 @@ A secure Okta-style portal built with Next.js 14, TypeScript, and Tailwind CSS. 
 - ⚙️ Admin tools for managing users (invite, edit, disable, reset password) and applications (CRUD with categories & featured flag)
 - 📝 Append-only audit log covering auth events and CRUD actions
 - 🛡️ CSRF protection, login rate limiting, content security policy headers, and Upstash-compatible throttling
+- 🚨 Automatic account lockout after repeated failed logins with admin unlock controls
 - 🧪 Vitest unit tests for security utilities and key UI components
 
 ## Getting Started
@@ -138,6 +139,7 @@ npm run start
 - HttpOnly, SameSite=Lax session cookies (Secure in production)
 - CSRF protection on all mutating routes
 - Login throttling with optional Upstash Redis backend
+- Automatic lockout after repeated failed logins (self-resets after 15 minutes, super admins can manually unlock)
 - Content Security Policy and security headers via Next.js middleware
 - Account deactivation and forced password change support
 

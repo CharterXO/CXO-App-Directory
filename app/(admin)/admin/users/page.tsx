@@ -13,7 +13,9 @@ export default async function AdminUsersPage() {
     role: user.role,
     isActive: user.isActive,
     mustChangePassword: user.mustChangePassword,
-    createdAt: user.createdAt.toISOString()
+    createdAt: user.createdAt.toISOString(),
+    lockedUntil: user.lockedUntil ? user.lockedUntil.toISOString() : null,
+    failedLoginAttempts: user.failedLoginAttempts
   }));
   return (
     <section className="space-y-6">

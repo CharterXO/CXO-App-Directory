@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { formatDistanceToNow } from 'date-fns';
 import { AdminTable } from '@/components/AdminTable';
 import { ModalForm } from '@/components/ModalForm';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
@@ -13,6 +14,8 @@ export interface AdminUser {
   isActive: boolean;
   mustChangePassword: boolean;
   createdAt: string;
+  lockedUntil: string | null;
+  failedLoginAttempts: number;
 }
 
 interface UsersAdminProps {
@@ -126,6 +129,41 @@ export function UsersAdmin({ initialUsers }: UsersAdminProps) {
     router.refresh();
   };
 
+  const unlockUser = async (user: AdminUser) => {
+    const response = await fetch(`/api/admin/users/${user.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-csrf-token': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content ?? ''
+      },
+      body: JSON.stringify({ clearLock: true })
+    });
+    if (!response.ok) {
+      alert('Unable to unlock user');
+      return;
+    }
+    router.refresh();
+  };
+
+  const renderLockStatus = (user: AdminUser) => {
+    if (!user.lockedUntil) return 'No';
+    const lockDate = new Date(user.lockedUntil);
+    if (Number.isNaN(lockDate.getTime()) || lockDate.getTime() <= Date.now()) {
+      return 'No';
+    }
+    return (
+      <span
+        className="text-xs font-semibold text-amber-600"
+        title={`Locked until ${lockDate.toLocaleString()}`}
+      >
+        Locked
+        <span className="ml-1 font-normal text-slate-500">
+          {formatDistanceToNow(lockDate, { addSuffix: true })}
+        </span>
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -149,9 +187,10 @@ export function UsersAdmin({ initialUsers }: UsersAdminProps) {
           { header: 'Username', accessor: (user) => user.username },
           { header: 'Role', accessor: (user) => (user.role === 'SUPER_ADMIN' ? 'Super Admin' : 'User'), className: 'w-40' },
           { header: 'Active', accessor: (user) => (user.isActive ? 'Yes' : 'No'), className: 'w-24' },
+          { header: 'Locked', accessor: (user) => renderLockStatus(user), className: 'w-52' },
           {
             header: 'Actions',
-            className: 'w-64',
+            className: 'w-72',
             accessor: (user) => (
               <div className="flex flex-wrap gap-2">
                 <button className="text-xs font-semibold text-primary-600" onClick={() => openEdit(user)}>
@@ -163,6 +202,11 @@ export function UsersAdmin({ initialUsers }: UsersAdminProps) {
                 <button className="text-xs font-semibold text-red-600" onClick={() => setConfirmDisable(user)}>
                   {user.isActive ? 'Disable' : 'Enable'}
                 </button>
+                {user.lockedUntil && new Date(user.lockedUntil).getTime() > Date.now() ? (
+                  <button className="text-xs font-semibold text-emerald-600" onClick={() => unlockUser(user)}>
+                    Unlock
+                  </button>
+                ) : null}
               </div>
             )
           }

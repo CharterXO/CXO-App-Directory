@@ -37,7 +37,8 @@ export const userUpdateSchema = z.object({
   role: z.enum(['SUPER_ADMIN', 'USER']).optional(),
   isActive: z.boolean().optional(),
   mustChangePassword: z.boolean().optional(),
-  password: z.string().min(12).max(128).optional()
+  password: z.string().min(12).max(128).optional(),
+  clearLock: z.boolean().optional()
 });
 
 export const auditLogQuerySchema = z.object({

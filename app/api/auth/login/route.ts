@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { addMinutes, isAfter } from 'date-fns';
 import { limit } from '@/lib/rate-limit';
 import { prisma } from '@/lib/prisma';
 import { logAudit } from '@/lib/audit';
@@ -29,16 +30,73 @@ export async function POST(request: Request) {
     return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent('Session expired. Please try again.')}`, request.url));
   }
 
-  const user = await prisma.user.findUnique({ where: { username: normalizedUsername } });
+  let user = await prisma.user.findUnique({ where: { username: normalizedUsername } });
   if (!user || !user.isActive) {
-    await logAudit({ action: 'login_failed', entityType: 'auth', actorId: null, metadata: { username: normalizedUsername } });
+    await logAudit({
+      action: 'login_failed',
+      entityType: 'auth',
+      actorId: null,
+      metadata: { username: normalizedUsername, reason: 'invalid_user' }
+    });
     return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent('Invalid username or password')}`, request.url));
+  }
+
+  const now = new Date();
+  if (user.lockedUntil) {
+    if (isAfter(user.lockedUntil, now)) {
+      await logAudit({
+        action: 'login_failed',
+        entityType: 'auth',
+        actorId: user.id,
+        metadata: { username: normalizedUsername, reason: 'account_locked', lockedUntil: user.lockedUntil }
+      });
+      return NextResponse.redirect(
+        new URL(`/login?error=${encodeURIComponent('Account temporarily locked. Try again later.')}`, request.url)
+      );
+    }
+
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: { lockedUntil: null, failedLoginAttempts: 0 }
+    });
   }
 
   const isValid = await verifyPassword(user.passwordHash, password);
   if (!isValid) {
-    await logAudit({ action: 'login_failed', entityType: 'auth', actorId: user.id, metadata: { username: normalizedUsername } });
-    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent('Invalid username or password')}`, request.url));
+    const attempts = user.failedLoginAttempts + 1;
+    const lockThreshold = 5;
+    const update: { failedLoginAttempts: number; lockedUntil?: Date | null } = { failedLoginAttempts: attempts };
+    let lockedUntil: Date | null = null;
+
+    if (attempts >= lockThreshold) {
+      lockedUntil = addMinutes(now, 15);
+      update.failedLoginAttempts = 0;
+      update.lockedUntil = lockedUntil;
+    }
+
+    await prisma.user.update({ where: { id: user.id }, data: update });
+
+    await logAudit({
+      action: 'login_failed',
+      entityType: 'auth',
+      actorId: user.id,
+      metadata: {
+        username: normalizedUsername,
+        reason: lockedUntil ? 'account_locked' : 'invalid_password',
+        lockedUntil,
+        failedAttempts: attempts
+      }
+    });
+
+    const message = lockedUntil ? 'Account temporarily locked. Try again later.' : 'Invalid username or password';
+    return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(message)}`, request.url));
+  }
+
+  if (user.failedLoginAttempts !== 0 || user.lockedUntil) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { failedLoginAttempts: 0, lockedUntil: null }
+    });
   }
 
   await createSession(user.id);

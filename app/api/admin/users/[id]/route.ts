@@ -35,6 +35,15 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     updateData.mustChangePassword = true;
     delete updateData.password;
   }
+  if (data.clearLock) {
+    updateData.lockedUntil = null;
+    updateData.failedLoginAttempts = 0;
+    delete updateData.clearLock;
+  }
+  if (typeof data.isActive === 'boolean' && data.isActive) {
+    updateData.lockedUntil = null;
+    updateData.failedLoginAttempts = 0;
+  }
 
   let user;
   try {
@@ -46,13 +55,18 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
 
-  if (data.password) {
+  const shouldInvalidateSessions = Boolean(data.password || data.isActive === false);
+  if (shouldInvalidateSessions) {
     await invalidateUserSessions(user.id);
   }
 
   const auditMetadata = { ...data } as Record<string, unknown>;
   if ('password' in auditMetadata) {
     delete auditMetadata.password;
+  }
+  if ('clearLock' in auditMetadata) {
+    auditMetadata.clearedLock = auditMetadata.clearLock;
+    delete auditMetadata.clearLock;
   }
   await logAudit({ action: 'user_updated', entityType: 'user', entityId: user.id, actorId: session.userId, metadata: auditMetadata });
 
