@@ -12,13 +12,15 @@ jobs:
       DATABASE_PROVIDER: sqlite
       DATABASE_URL: file:./dev.db
       AUTH_SECRET: test-secret
+      SKIP_SWC_BINARY_DOWNLOAD_FOR_CI: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 18
           cache: npm
-      - run: npm install
+      - run: npm ci --omit=optional
       - run: npx prisma generate
       - run: npm run lint
       - run: npm run typecheck

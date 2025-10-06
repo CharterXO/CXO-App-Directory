@@ -82,6 +82,11 @@ npm run typecheck
 npm run test
 ```
 
+### Continuous Integration
+
+- The provided GitHub Actions workflow installs dependencies with `npm ci --omit=optional` to avoid downloading platform-specific SWC binaries in network-restricted runners.
+- The workflow also sets `SKIP_SWC_BINARY_DOWNLOAD_FOR_CI=true` so Next.js skips binary downloads entirely and falls back to the WASM implementation, which keeps installs reliable in private registries.
+
 ### Production build
 
 ```bash
