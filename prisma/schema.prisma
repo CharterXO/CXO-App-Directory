@@ -1,0 +1,62 @@
+// Prisma schema for the CXO App Directory
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = env("DATABASE_PROVIDER")
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  USER
+}
+
+model User {
+  id                String     @id @default(cuid())
+  username          String     @unique
+  passwordHash      String
+  role              Role       @default(USER)
+  isActive          Boolean    @default(true)
+  mustChangePassword Boolean   @default(false)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  AuditLogs         AuditLog[]
+  Sessions          Session[]
+}
+
+model App {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  loginUrl    String
+  description String
+  categories  Json       @default("[]")
+  iconUrl     String?
+  featured    Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  AuditLogs   AuditLog[]
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id])
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+  sessionToken String   @unique
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
