@@ -5,6 +5,7 @@ import { requireSession, assertCsrfToken, invalidateUserSessions } from '@/lib/a
 import { userUpdateSchema } from '@/lib/validators';
 import { hashPassword } from '@/lib/auth/password';
 import { logAudit } from '@/lib/audit';
+import { omit } from '@/lib/utils';
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   const cookieStore = cookies();
@@ -70,6 +71,5 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
   await logAudit({ action: 'user_updated', entityType: 'user', entityId: user.id, actorId: session.userId, metadata: auditMetadata });
 
-  const { passwordHash: _passwordHash, ...safeUser } = user;
-  return NextResponse.json(safeUser);
+  return NextResponse.json(omit(user, ['passwordHash'] as const));
 }

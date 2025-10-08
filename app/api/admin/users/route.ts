@@ -5,6 +5,7 @@ import { requireSession, assertCsrfToken } from '@/lib/auth/session';
 import { userCreateSchema } from '@/lib/validators';
 import { hashPassword } from '@/lib/auth/password';
 import { logAudit } from '@/lib/audit';
+import { omit } from '@/lib/utils';
 
 export async function GET() {
   const session = await requireSession('SUPER_ADMIN').catch(() => null);
@@ -14,7 +15,7 @@ export async function GET() {
 
   const users = await prisma.user.findMany({ orderBy: { username: 'asc' } });
   return NextResponse.json(
-    users.map(({ passwordHash: _passwordHash, ...user }) => user)
+    users.map((user) => omit(user, ['passwordHash'] as const))
   );
 }
 
@@ -50,6 +51,5 @@ export async function POST(request: Request) {
 
   await logAudit({ action: 'user_created', entityType: 'user', entityId: user.id, actorId: session.userId, metadata: { username: user.username, role: user.role } });
 
-  const { passwordHash: _passwordHash, ...safeUser } = user;
-  return NextResponse.json(safeUser, { status: 201 });
+  return NextResponse.json(omit(user, ['passwordHash'] as const), { status: 201 });
 }
